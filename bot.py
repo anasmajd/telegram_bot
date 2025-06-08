@@ -3,14 +3,26 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import logging
 
-# 🔹 ضع هنا توكن البوت الخاص بك:
-BOT_TOKEN = "8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo"
+# 🔹 التوكن الخاص بالبوت:
+BOT_TOKEN = "ضع_التوكن_هنا"
 
-# 🔹 ID الادمن الذي يستلم رسالة الإحالة (ضع ID الخاص بك كادمن):
-ADMIN_ID =  920325080 # استبدله بالـ user_id الخاص بك (يمكنك معرفته من /start أو عبر مواقع مثل get user id bot)
+# 🔹 ID الادمن:
+ADMIN_ID = 123456789  # استبدله بالـ user_id الخاص بك
 
 # إعداد اللوج
 logging.basicConfig(level=logging.INFO)
+
+# دالة get_username_by_id
+def get_username_by_id(user_id):
+    conn = sqlite3.connect("referral.db")
+    c = conn.cursor()
+
+    c.execute("SELECT username FROM users WHERE user_id=?", (user_id,))
+    result = c.fetchone()
+
+    conn.close()
+
+    return result[0] if result and result[0] else "بدون يوزرنيم"
 
 # دالة /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,6 +31,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = user.username or "بدون يوزرنيم"
     full_name = user.full_name
 
+    args = context.args
+    referrer_code = args[0] if args else None
+
     conn = sqlite3.connect("referral.db")
     c = conn.cursor()
 
@@ -26,43 +41,50 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
     user_exists = c.fetchone()
 
-    # استخراج كود الإحالة
-    args = context.args
-    referrer_code = args[0] if args else None
-
     if not user_exists:
         referred_by = referrer_code if referrer_code else None
+
+        # سجل المستخدم
         c.execute("INSERT INTO users (user_id, username, full_name, referred_by) VALUES (?, ?, ?, ?)", 
                   (user_id, username, full_name, referred_by))
         conn.commit()
 
-        # لو تم الدخول من رابط إحالة — أضف في جدول الإحالات
+        # لو دخل من رابط إحالة
         if referred_by:
             referrer_id = int(referred_by.replace("REP_", ""))
+
+            # أضف للإحالات
             c.execute("INSERT INTO referrals (referrer_id, referred_id, referred_username) VALUES (?, ?, ?)", 
                       (referrer_id, user_id, username))
             conn.commit()
 
-            # أرسل رسالة للادمن
+            # أرسل للادمن
+            ref_username = get_username_by_id(referrer_id)
             await context.bot.send_message(chat_id=ADMIN_ID, text=f"""📥 إحالة جديدة!
 👤 المستخدم: {full_name} (@{username})
 🆔 ID: {user_id}
-🎯 من مندوب: @{get_username_by_id(referrer_id)}
+🎯 من مندوب: @{ref_username}
 """)
+        
+        # رسالة ترحيب
+        await update.message.reply_text(f"""👋 أهلاً بك في المتجر!
+✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.
+🔗 يمكنك الحصول على رابط الإحالة الخاص بك باستخدام الأمر /get_link""")
+
+    else:
+        # لو مستخدم قديم → فقط رسالة عادية
+        await update.message.reply_text("👋 مرحباً بك مجدداً في المتجر! يمكنك استخدام /get_link لمشاركة رابط الإحالة الخاص بك.")
 
     conn.close()
 
-    # رسالة ترحيب
-    await update.message.reply_text("👋 أهلاً بك في المتجر!\n✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.")
-
-# دالة get_link
+# دالة /get_link
 async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     referral_code = f"REP_{user_id}"
     link = f"https://t.me/{context.bot.username}?start={referral_code}"
     await update.message.reply_text(f"🔗 رابط الإحالة الخاص بك:\n{link}")
 
-# دالة my_sales
+# دالة /my_sales
 async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -76,7 +98,7 @@ async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"📊 عدد الإحالات المسجلة لديك: {count}")
 
-# دالة my_referrals
+# دالة /my_referrals
 async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -97,18 +119,6 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = "❌ لا يوجد لديك إحالات حتى الآن."
 
     await update.message.reply_text(text)
-
-# دالة لجلب username للمندوب حسب user_id
-def get_username_by_id(user_id):
-    conn = sqlite3.connect("referral.db")
-    c = conn.cursor()
-
-    c.execute("SELECT username FROM users WHERE user_id=?", (user_id,))
-    result = c.fetchone()
-
-    conn.close()
-
-    return result[0] if result and result[0] else "بدون يوزرنيم"
 
 # تشغيل البوت
 if __name__ == "__main__":
