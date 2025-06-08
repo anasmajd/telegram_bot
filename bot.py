@@ -4,10 +4,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import logging
 
 # 🔹 التوكن الخاص بالبوت:
-BOT_TOKEN = "ضع_التوكن_هنا"
+BOT_TOKEN = "8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo"
 
 # 🔹 ID الادمن:
-ADMIN_ID = 123456789  # استبدله بالـ user_id الخاص بك
+ADMIN_ID = 920325080  # استبدله بالـ user_id الخاص بك
 
 # إعداد اللوج
 logging.basicConfig(level=logging.INFO)
