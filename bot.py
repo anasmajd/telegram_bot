@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import sqlite3
 import datetime
 
-# ✅ هنا ضع التوكن الخاص بك
+# ✅ هنا توكن البوت الخاص بك
 BOT_TOKEN = "8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo"
 
 # تسجيل إحالة جديدة
@@ -24,19 +24,24 @@ def save_referral(user_id, rep_id):
 
     conn.close()
 
-# /start
+# /start — نسخة محسّنة
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     args = context.args
 
+    # هل هناك كود إحالة؟
+    rep_id = None
     if args:
-        rep_id = args[0]  # كود المندوب
+        rep_id = args[0]
+
+    # نحاول تسجيل الإحالة دائمًا لو فيه rep_id
+    if rep_id:
         save_referral(user_id, rep_id)
         await update.message.reply_text(f"✅ تم تسجيلك مع المندوب: {rep_id}")
     else:
         await update.message.reply_text("👋 أهلاً بك في المتجر!")
 
-# /my_referrals
+# /my_referrals — عرض الإحالات
 async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rep_id = f"REP_{update.message.from_user.id}"  # فرضًا مندوب id = REP_<chat_id>
     conn = sqlite3.connect("referrals.db")
@@ -68,5 +73,5 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
 
-    print("✅ البوت يعمل كنظام إحالة.")
+    print("✅ البوت يعمل كنظام إحالة احترافي.")
     app.run_polling()
