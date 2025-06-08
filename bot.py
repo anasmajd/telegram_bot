@@ -1,145 +1,143 @@
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import logging
 import sqlite3
 import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ✅ توكن البوت الخاص بك
-BOT_TOKEN = "8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo"
+# ✅ توكن البوت:
+BOT_TOKEN = '8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
 
-# حفظ الإحالة
-def save_referral(user_id, rep_id, username):
-    conn = sqlite3.connect("referrals.db")
-    c = conn.cursor()
+# ✅ ضع هنا ID الخاص بك (صاحب البوت) لكي تستقبل Log عند تسجيل إحالة جديدة:
+ADMIN_ID = 920325080  # <-- هذا هو ID حسب الرابط الذي ظهر عندك
 
-    c.execute("SELECT * FROM referrals WHERE user_id=?", (user_id,))
-    result = c.fetchone()
+# إعداد قاعدة البيانات
+conn = sqlite3.connect('referrals.db')
+cursor = conn.cursor()
 
-    if not result:
-        date_joined = datetime.datetime.now().strftime("%Y-%m-%d")
-        c.execute("INSERT INTO referrals (user_id, username, rep_id, date_joined) VALUES (?, ?, ?, ?)",
-                  (user_id, username, rep_id, date_joined))
-        conn.commit()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS referrals (
+        user_id INTEGER PRIMARY KEY,
+        username TEXT,
+        rep_id TEXT,
+        date_joined TEXT
+    )
+''')
+conn.commit()
 
-    conn.close()
+# إعداد اللوجات
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    username = update.message.from_user.username or "بدون اسم مستخدم"
+    user = update.message.from_user
     args = context.args
+    rep_id = args[0] if args else None
 
-    print(f"User {user_id} sent: {update.message.text}")
+    # تحقق هل المستخدم مسجل مسبقاً
+    cursor.execute('SELECT * FROM referrals WHERE user_id = ?', (user.id,))
+    result = cursor.fetchone()
 
-    rep_id = None
-    if args:
-        rep_id = args[0]
+    if not result and rep_id:
+        # سجل الإحالة
+        cursor.execute('''
+            INSERT INTO referrals (user_id, username, rep_id, date_joined)
+            VALUES (?, ?, ?, ?)
+        ''', (user.id, user.username or '', rep_id, datetime.date.today().isoformat()))
+        conn.commit()
 
-    if rep_id:
-        save_referral(user_id, rep_id, username)
-        await update.message.reply_text(f"✅ تم تسجيلك مع المندوب: {rep_id}")
-    else:
-        # تحسين: زر خاص لتأكيد تسجيل الإحالة
-        bot_username = "Janastoreiqbot"
-        rep_id_button = f"REP_{update.message.from_user.id}"
+        await context.bot.send_message(chat_id=user.id, text='✅ تم تسجيل دخولك من رابط إحالة بنجاح!')
 
-        referral_link = f"https://t.me/{bot_username}?start={rep_id_button}"
+        # أرسل Log إلى الـ ADMIN
+        await context.bot.send_message(chat_id=ADMIN_ID,
+                                       text=f'📥 إحالة جديدة!\n👤 المستخدم: {user.full_name} (@{user.username})\n🆔 ID: {user.id}\n🎯 من مندوب: {rep_id}')
 
-        keyboard = [
-            [InlineKeyboardButton("🔗 اضغط هنا للدخول من رابط الإحالة (خارج تيليجرام)", url=referral_link)],
-            [InlineKeyboardButton("✅ تم الدخول من رابط الإحالة", callback_data=f"referral_{rep_id_button}")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await update.message.reply_text(
-            "👋 أهلاً بك في المتجر!\n\n"
-            "✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.\n"
-            "لو لم تدخل من رابط إحالة — اضغط الزر أدناه للدخول من رابطك الخاص.\n"
-            "🔹 بعد الضغط، يمكنك الضغط على زر ✅ لتأكيد تسجيل الإحالة.",
-            reply_markup=reply_markup
-        )
-
-# /my_referrals
-async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rep_id = f"REP_{update.message.from_user.id}"
-    conn = sqlite3.connect("referrals.db")
-    c = conn.cursor()
-
-    six_months_ago = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime("%Y-%m-%d")
-    c.execute("DELETE FROM referrals WHERE date_joined <= ?", (six_months_ago,))
-    conn.commit()
-
-    c.execute("SELECT user_id, username, date_joined FROM referrals WHERE rep_id=?", (rep_id,))
-    rows = c.fetchall()
-
-    if rows:
-        message = f"📋 قائمة الإحالات الحالية:\n"
-        for row in rows:
-            username_display = f"@{row[1]}" if row[1] != "بدون اسم مستخدم" else f"User ID: {row[0]}"
-            message += f"- {username_display} | منذ: {row[2]}\n"
-    else:
-        message = "❌ لا توجد إحالات حالياً."
-
-    await update.message.reply_text(message)
-    conn.close()
-
-# /my_sales
-async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rep_id = f"REP_{update.message.from_user.id}"
-    conn = sqlite3.connect("referrals.db")
-    c = conn.cursor()
-
-    six_months_ago = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime("%Y-%m-%d")
-    c.execute("DELETE FROM referrals WHERE date_joined <= ?", (six_months_ago,))
-    conn.commit()
-
-    c.execute("SELECT COUNT(*) FROM referrals WHERE rep_id=?", (rep_id,))
-    count = c.fetchone()[0]
-
-    message = f"📊 عدد الإحالات الخاصة بك: {count}"
-
-    await update.message.reply_text(message)
-    conn.close()
-
-# /get_link
-async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    bot_username = "Janastoreiqbot"
-    rep_id = f"REP_{update.message.from_user.id}"
-
-    referral_link = f"https://t.me/{bot_username}?start={rep_id}"
-
+    # عرض الرسالة الافتراضية مع الأزرار
     keyboard = [
-        [InlineKeyboardButton("🔗 رابط الإحالة الخاص بك", url=referral_link)]
+        [InlineKeyboardButton("🔗 اضغط هنا للدخول من رابط الإحالة (خارج تيليجرام)", url=f'https://t.me/{context.bot.username}?start=REP_{user.id}')],
+        [InlineKeyboardButton("✅ تم الدخول من رابط الإحالة", callback_data='confirm_referral')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    message = f"🔗 رابط الإحالة الخاص بك:\n{referral_link}"
+    await context.bot.send_message(chat_id=user.id,
+                                   text='👋 أهلاً بك في المتجر!\n\n✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.\nلو لم تدخل من رابط إحالة — اضغط الزر أدناه للدخول من رابطك الخاص.\n\n🔷 بعد الضغط، يمكنك الضغط على زر ✅ لتأكيد تسجيل الإحالة.',
+                                   reply_markup=reply_markup)
 
-    await update.message.reply_text(message, reply_markup=reply_markup)
-
-# 🎁 Callback Query (لما يضغط ✅ تم الدخول)
-async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# زر ✅ تم الدخول
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user = query.from_user
+
     await query.answer()
 
-    user_id = query.from_user.id
-    username = query.from_user.username or "بدون اسم مستخدم"
+    # تحقق هل المستخدم مسجل
+    cursor.execute('SELECT * FROM referrals WHERE user_id = ?', (user.id,))
+    result = cursor.fetchone()
 
-    # نستخرج rep_id من callback_data
-    rep_id = query.data.replace("referral_", "")
+    if not result:
+        # سجل الإحالة يدوياً من الزر ✅
+        cursor.execute('''
+            INSERT INTO referrals (user_id, username, rep_id, date_joined)
+            VALUES (?, ?, ?, ?)
+        ''', (user.id, user.username or '', 'manual_entry', datetime.date.today().isoformat()))
+        conn.commit()
 
-    save_referral(user_id, rep_id, username)
+        await query.edit_message_text('✅ تم تسجيل دخولك بنجاح عبر زر الإحالة!')
 
-    await query.edit_message_text("✅ تم تسجيلك مع المندوب بنجاح!")
+        # أرسل Log إلى ADMIN
+        await context.bot.send_message(chat_id=ADMIN_ID,
+                                       text=f'📥 إحالة جديدة (من الزر ✅)!\n👤 المستخدم: {user.full_name} (@{user.username})\n🆔 ID: {user.id}\n🎯 مصدر: manual_entry')
 
-# إعداد البوت
-if __name__ == "__main__":
+    else:
+        await query.edit_message_text('✅ أنت مسجل بالفعل! شكراً.')
+
+# /get_link
+async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    referral_link = f"https://t.me/{context.bot.username}?start=REP_{user.id}"
+
+    await context.bot.send_message(chat_id=user.id,
+                                   text=f'🔗 رابط الإحالة الخاص بك:\n{referral_link}')
+
+# /my_sales
+async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    rep_id = f'REP_{user.id}'
+
+    cursor.execute('SELECT COUNT(*) FROM referrals WHERE rep_id = ?', (rep_id,))
+    count = cursor.fetchone()[0]
+
+    await context.bot.send_message(chat_id=user.id,
+                                   text=f'📊 عدد الإحالات المسجلة لديك: {count}')
+
+# /my_referrals
+async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    rep_id = f'REP_{user.id}'
+
+    cursor.execute('SELECT username, date_joined FROM referrals WHERE rep_id = ?', (rep_id,))
+    rows = cursor.fetchall()
+
+    if not rows:
+        await context.bot.send_message(chat_id=user.id,
+                                       text='❌ لا يوجد لديك إحالات حتى الآن.')
+    else:
+        message = '📋 قائمة الإحالات:\n\n'
+        for i, (username, date_joined) in enumerate(rows, start=1):
+            username_display = f'@{username}' if username else 'بدون اسم مستخدم'
+            message += f'{i}. {username_display} — {date_joined}\n'
+
+        await context.bot.send_message(chat_id=user.id, text=message)
+
+# MAIN
+if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("my_referrals", my_referrals))
-    app.add_handler(CommandHandler("my_sales", my_sales))
-    app.add_handler(CommandHandler("get_link", get_link))
-    app.add_handler(CallbackQueryHandler(referral_callback, pattern=r"^referral_"))
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(CommandHandler('get_link', get_link))
+    app.add_handler(CommandHandler('my_sales', my_sales))
+    app.add_handler(CommandHandler('my_referrals', my_referrals))
 
-    print("✅ البوت يعمل كنظام إحالة احترافي.")
+    print("🤖 Bot is running...")
     app.run_polling()
