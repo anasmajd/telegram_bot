@@ -3,108 +3,120 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import logging
 
-# ✅ التوكن (حقيقي) انسخه من BotFather
-TOKEN ='8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
+# ✅ ضع التوكن الخاص بك هنا 👇
+BOT_TOKEN = '8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
 
-# ✅ Admin User ID (رقمك انت بالتيليجرام)
-ADMIN_USER_ID = 920325080
+# ✅ ضع معرفك كأدمن 👇
+ADMIN_ID = 920325080  # ضع هنا user_id الخاص بك
 
-# ✅ إعداد قاعدة البيانات
-conn = sqlite3.connect('referrals.db')
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS referrals (
-        user_id INTEGER PRIMARY KEY,
-        username TEXT,
-        referrer_id INTEGER
-    )
-''')
-conn.commit()
+# تفعيل اللوج
+logging.basicConfig(level=logging.INFO)
 
-# ✅ دالة start
+# دالة إنشاء اتصال قاعدة بيانات
+def get_db_connection():
+    conn = sqlite3.connect('referral.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# دالة start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    username = update.effective_user.username or ""
+    user_id = update.message.from_user.id
+    username = update.message.from_user.username or ""
+    full_name = update.message.from_user.full_name
     args = context.args
-    referrer_user_id = None
+    referrer_id = None
+    referrer_username = None
 
     if args and args[0].startswith("REP_"):
-        try:
-            referrer_user_id = int(args[0][4:])
-        except:
-            referrer_user_id = None
+        referrer_id = int(args[0].split("_")[1])
 
-    # ✅ تحقق هل المستخدم موجود
-    cursor.execute("SELECT * FROM referrals WHERE user_id=?", (user_id,))
-    result = cursor.fetchone()
+    conn = get_db_connection()
+    c = conn.cursor()
 
-    if not result:
-        # ✅ سجّل المستخدم
-        cursor.execute("INSERT INTO referrals (user_id, username, referrer_id) VALUES (?, ?, ?)",
-                       (user_id, username, referrer_user_id))
+    # فحص هل المستخدم موجود أصلا
+    c.execute('SELECT * FROM referrals WHERE user_id = ?', (user_id,))
+    if not c.fetchone():
+        # لو referrer_id موجود — محاولة جلب username المندوب
+        if referrer_id:
+            c.execute('SELECT username FROM referrals WHERE user_id = ?', (referrer_id,))
+            row = c.fetchone()
+            if row and row['username']:
+                referrer_username = row['username']
+            else:
+                referrer_username = ""
+
+        # إدخال المستخدم
+        c.execute('''
+            INSERT INTO referrals (user_id, username, full_name, referrer_id, referrer_username)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, username, full_name, referrer_id, referrer_username))
+
         conn.commit()
 
-        # ✅ ارسل اشعار للادمن
-        if referrer_user_id:
-            ref_cursor = conn.cursor()
-            ref_cursor.execute("SELECT username FROM referrals WHERE user_id=?", (referrer_user_id,))
-            ref_data = ref_cursor.fetchone()
-            ref_username = ref_data[0] if ref_data and ref_data[0] else f"{referrer_user_id}"
+        # إشعار الأدمن
+        message = (
+            f"📥 إحالة جديدة!\n"
+            f"👤 المستخدم: {full_name} (@{username})\n"
+            f"🆔 ID: {user_id}\n"
+        )
+        if referrer_id:
+            message += f"🎯 من مندوب: @{referrer_username} (ID: {referrer_id})"
+        else:
+            message += f"🎯 لا يوجد مندوب"
 
-            msg = f"""
-📥 إحالة جديدة!
-👤 المستخدم: {update.effective_user.full_name} (@{username})
-🆔 ID: {user_id}
-🎯 من مندوب: @{ref_username}
-"""
-            await context.bot.send_message(chat_id=ADMIN_USER_ID, text=msg)
+        await context.bot.send_message(chat_id=ADMIN_ID, text=message)
 
-    # ✅ رسالة الترحيب
-    await update.message.reply_text(
-        "👋 أهلاً بك في المتجر!\n✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.\nلو لم تدخل من رابط إحالة — اضغط الزر أدناه للدخول من رابطك الخاص.\n\n🔵 بعد الضغط، يمكنك الضغط على زر ✅ لتأكيد تسجيل الإحالة.",
-    )
+    conn.close()
 
-# ✅ get_link
+    await update.message.reply_text("👋 أهلاً بك في المتجر!\n✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.\n📌 لو لم تدخل من رابط إحالة — اضغط الزر أدناه للدخول من رابطك الخاص.")
+
+# أمر /get_link
 async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    link = f"https://t.me/Janastoreiqbot?start=REP_{user_id}"
-    await update.message.reply_text(f"🔗 رابط الإحالة الخاص بك:\n{link}")
+    user_id = update.message.from_user.id
+    referral_link = f"https://t.me/{context.bot.username}?start=REP_{user_id}"
+    await update.message.reply_text(f"🔗 رابط الإحالة الخاص بك:\n{referral_link}")
 
-# ✅ my_referrals
-async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    cursor.execute("SELECT user_id, username FROM referrals WHERE referrer_id=?", (user_id,))
-    referrals = cursor.fetchall()
-
-    if not referrals:
-        await update.message.reply_text("❌ لا يوجد لديك إحالات حتى الآن.")
-        return
-
-    msg = "📋 قائمة الإحالات:\n"
-    for r in referrals:
-        user_id_r = r[0]
-        username_r = r[1]
-        username_r = f"@{username_r}" if username_r else f"ID: {user_id_r}"
-        msg += f"- {username_r}\n"
-
-    await update.message.reply_text(msg)
-
-# ✅ my_sales
+# أمر /my_sales
 async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    cursor.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id=?", (user_id,))
-    count = cursor.fetchone()[0]
+    user_id = update.message.from_user.id
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM referrals WHERE referrer_id = ?', (user_id,))
+    count = c.fetchone()[0]
+    conn.close()
     await update.message.reply_text(f"📊 عدد الإحالات المسجلة لديك: {count}")
 
-# ✅ Main app
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    app = ApplicationBuilder().token(TOKEN).build()
+# أمر /my_referrals
+async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT username, full_name FROM referrals WHERE referrer_id = ?', (user_id,))
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        await update.message.reply_text("❌ لا يوجد لديك إحالات حتى الآن.")
+    else:
+        message = "📋 قائمة الإحالات:\n\n"
+        for row in rows:
+            username = row['username'] or "No Username"
+            full_name = row['full_name']
+            message += f"👤 {full_name} (@{username})\n"
+        await update.message.reply_text(message)
+
+# الدالة الرئيسية
+async def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("get_link", get_link))
-    app.add_handler(CommandHandler("my_referrals", my_referrals))
     app.add_handler(CommandHandler("my_sales", my_sales))
+    app.add_handler(CommandHandler("my_referrals", my_referrals))
 
     print("✅ البوت يعمل الآن ...")
-    app.run_polling()
+    await app.run_polling()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
