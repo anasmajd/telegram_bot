@@ -4,16 +4,19 @@ import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-# ✅ ضع التوكن الخاص بك هنا:
+# ✅ التوكن الخاص بك:
 BOT_TOKEN = "8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo"
 
-# إعدادات اللوق
+# ✅ رقمك كـ Admin (صاحب البوت):
+ADMIN_ID = 920325080
+
+# إعداد اللوق
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# ✅ إنشاء قاعدة البيانات إن لم تكن موجودة
+# ✅ إنشاء قاعدة البيانات
 conn = sqlite3.connect('referrals.db')
 cursor = conn.cursor()
 cursor.execute('''
@@ -51,12 +54,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ))
         conn.commit()
 
+        # ✅ رسالة للمستخدم
         if rep_id:
-            await update.message.reply_text(
-                "✅ تم الدخول من رابط الإحالة ✅"
-            )
+            await update.message.reply_text("✅ تم الدخول من رابط الإحالة ✅")
 
-    # رسالة ترحيب
+            # ✅ رسالة إلى Admin
+            try:
+                await context.bot.send_message(
+                    chat_id=ADMIN_ID,
+                    text=f"📥 إحالة جديدة!\n👤 المستخدم: {user.full_name} (@{user.username})\n🆔 ID: {user.id}\n🎯 من مندوب: {rep_id}"
+                )
+            except Exception as e:
+                print(f"❌ خطأ أثناء إرسال رسالة Admin: {e}")
+
+    # رسالة ترحيب عامة
     welcome_text = (
         "👋 أهلاً بك في المتجر!\n\n"
         "✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.\n"
