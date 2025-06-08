@@ -77,6 +77,28 @@ async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(message)
 
+# /my_sales — عرض عدد الإحالات
+async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    rep_id = f"REP_{update.message.from_user.id}"  # مندوب id = REP_<chat_id>
+    conn = sqlite3.connect("referrals.db")
+    c = conn.cursor()
+
+    # حذف الإحالات القديمة (أكثر من 6 أشهر)
+    six_months_ago = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime("%Y-%m-%d")
+    c.execute("DELETE FROM referrals WHERE date_joined <= ?", (six_months_ago,))
+    conn.commit()
+
+    # حساب عدد الإحالات الحالية
+    c.execute("SELECT COUNT(*) FROM referrals WHERE rep_id=?", (rep_id,))
+    count = c.fetchone()[0]
+
+    message = f"📊 عدد الإحالات الخاصة بك: {count}"
+
+    await update.message.reply_text(message)
+    conn.close()
+
+
+
 # إعداد البوت
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -84,6 +106,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
     app.add_handler(CommandHandler("get_link", get_link))  # ✅ أضفنا /get_link
+app.add_handler(CommandHandler("my_sales", my_sales))
 
     print("✅ البوت يعمل كنظام إحالة احترافي.")
     app.run_polling()
