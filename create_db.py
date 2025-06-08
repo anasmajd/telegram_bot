@@ -1,22 +1,28 @@
 import sqlite3
 
-# إنشاء الاتصال بقاعدة البيانات
-conn = sqlite3.connect('referral.db')
+# إنشاء قاعدة البيانات وجداولها
+conn = sqlite3.connect("referral.db")
 c = conn.cursor()
 
-# إنشاء جدول الإحالات
-c.execute('''
-    CREATE TABLE IF NOT EXISTS referrals (
+# جدول المستخدمين
+c.execute("""
+    CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         username TEXT,
         full_name TEXT,
-        referrer_id INTEGER,
-        referrer_username TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        referred_by TEXT
     )
-''')
+""")
 
-# حفظ التغييرات
+# جدول الإحالات
+c.execute("""
+    CREATE TABLE IF NOT EXISTS referrals (
+        referrer_id INTEGER,
+        referred_id INTEGER,
+        referred_username TEXT
+    )
+""")
+
 conn.commit()
 conn.close()
 
