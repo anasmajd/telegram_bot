@@ -4,7 +4,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import logging
 
 # ✅ التوكن (حقيقي) انسخه من BotFather
-TOKEN = '6703502189:AAHZ4F6UsPKNOpZMAuEKqC4S-5cvR9EpF0c'
+TOKEN ='8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
 
 # ✅ Admin User ID (رقمك انت بالتيليجرام)
 ADMIN_USER_ID = 920325080
