@@ -1,9 +1,11 @@
 import sqlite3
 
-conn = sqlite3.connect("referrals.db")
-c = conn.cursor()
+# إنشاء أو فتح قاعدة بيانات
+conn = sqlite3.connect('referrals.db')
+cursor = conn.cursor()
 
-c.execute('''
+# إنشاء جدول referrals
+cursor.execute('''
     CREATE TABLE IF NOT EXISTS referrals (
         user_id INTEGER PRIMARY KEY,
         username TEXT,
@@ -15,4 +17,4 @@ c.execute('''
 conn.commit()
 conn.close()
 
-print("✅ تم إنشاء قاعدة البيانات بنجاح.")
+print("✅ قاعدة البيانات referrals.db تم إنشاؤها بنجاح!")
