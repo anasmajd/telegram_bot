@@ -43,7 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # /my_referrals — عرض الإحالات
 async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rep_id = f"REP_{update.message.from_user.id}"  # فرضًا مندوب id = REP_<chat_id>
+    rep_id = f"REP_{update.message.from_user.id}"  # مندوب id = REP_<chat_id>
     conn = sqlite3.connect("referrals.db")
     c = conn.cursor()
 
@@ -66,12 +66,24 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message)
     conn.close()
 
+# /get_link — توليد رابط إحالة للمندوب
+async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    bot_username = "Janastoreiqbot"  # ✅ اكتب هنا اسم البوت الحقيقي بدون @
+    rep_id = f"REP_{update.message.from_user.id}"
+
+    referral_link = f"https://t.me/{bot_username}?start={rep_id}"
+
+    message = f"🔗 رابط الإحالة الخاص بك:\n{referral_link}"
+
+    await update.message.reply_text(message)
+
 # إعداد البوت
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
+    app.add_handler(CommandHandler("get_link", get_link))  # ✅ أضفنا /get_link
 
     print("✅ البوت يعمل كنظام إحالة احترافي.")
     app.run_polling()
