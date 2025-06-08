@@ -1,6 +1,6 @@
 import sqlite3
 
-# إنشاء أو فتح قاعدة بيانات
+# إنشاء الاتصال بقاعدة البيانات (لو مش موجودة سيتم إنشاؤها)
 conn = sqlite3.connect('referrals.db')
 cursor = conn.cursor()
 
@@ -14,7 +14,8 @@ cursor.execute('''
     )
 ''')
 
+# حفظ التغييرات وإغلاق الاتصال
 conn.commit()
 conn.close()
 
-print("✅ قاعدة البيانات referrals.db تم إنشاؤها بنجاح!")
+print("✅ تم إنشاء قاعدة البيانات referrals.db والجدول بنجاح.")
