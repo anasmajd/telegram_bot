@@ -24,7 +24,7 @@ def save_referral(user_id, rep_id):
 
     conn.close()
 
-# /start — نسخة محسّنة
+# /start — تسجيل إحالة أو ترحيب عادي
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     args = context.args
@@ -41,7 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("👋 أهلاً بك في المتجر!")
 
-# /my_referrals — عرض الإحالات
+# /my_referrals — عرض قائمة الإحالات
 async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rep_id = f"REP_{update.message.from_user.id}"  # مندوب id = REP_<chat_id>
     conn = sqlite3.connect("referrals.db")
@@ -66,17 +66,6 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message)
     conn.close()
 
-# /get_link — توليد رابط إحالة للمندوب
-async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    bot_username = "Janastoreiqbot"  # ✅ اكتب هنا اسم البوت الحقيقي بدون @
-    rep_id = f"REP_{update.message.from_user.id}"
-
-    referral_link = f"https://t.me/{bot_username}?start={rep_id}"
-
-    message = f"🔗 رابط الإحالة الخاص بك:\n{referral_link}"
-
-    await update.message.reply_text(message)
-
 # /my_sales — عرض عدد الإحالات
 async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rep_id = f"REP_{update.message.from_user.id}"  # مندوب id = REP_<chat_id>
@@ -97,7 +86,16 @@ async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message)
     conn.close()
 
+# /get_link — توليد رابط إحالة
+async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    bot_username = "Janastoreiqbot"  # ✅ اكتب هنا اسم البوت بدون @
+    rep_id = f"REP_{update.message.from_user.id}"
 
+    referral_link = f"https://t.me/{bot_username}?start={rep_id}"
+
+    message = f"🔗 رابط الإحالة الخاص بك:\n{referral_link}"
+
+    await update.message.reply_text(message)
 
 # إعداد البوت
 if __name__ == "__main__":
@@ -105,8 +103,8 @@ if __name__ == "__main__":
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
-    app.add_handler(CommandHandler("get_link", get_link))  # ✅ أضفنا /get_link
-app.add_handler(CommandHandler("my_sales", my_sales))
+    app.add_handler(CommandHandler("my_sales", my_sales))
+    app.add_handler(CommandHandler("get_link", get_link))
 
     print("✅ البوت يعمل كنظام إحالة احترافي.")
     app.run_polling()
