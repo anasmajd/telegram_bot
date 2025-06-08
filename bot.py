@@ -7,7 +7,7 @@ import logging
 TOKEN = '6703502189:AAHZ4F6UsPKNOpZMAuEKqC4S-5cvR9EpF0c'
 
 # ✅ Admin User ID (رقمك انت بالتيليجرام)
-ADMIN_USER_ID = 5700638287
+ADMIN_USER_ID = 920325080
 
 # ✅ إعداد قاعدة البيانات
 conn = sqlite3.connect('referrals.db')
