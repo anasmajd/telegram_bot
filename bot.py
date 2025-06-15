@@ -64,6 +64,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 أهلاً بك في المتجر!\n✅ لو دخلت من رابط إحالة ستظهر لك رسالة تأكيد.\nلو لم تدخل من رابط إحالة — اضغط الزر أدناه للدخول من رابطك الخاص.\n\n🔵 بعد الضغط، يمكنك الضغط على زر ✅ لتأكيد تسجيل الإحالة.",
     )
 
+# ✅ دالة التواصل مع الادمن
+async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # استرجاع رسالة المستخدم
+    message = update.message.text
+
+    # إرسال الرسالة إلى الإدمن
+    await context.bot.send_message(chat_id=ADMIN_USER_ID, text=f"رسالة من المستخدم @{update.effective_user.username}:\n\n{message}")
+    
+    # إرسال تأكيد للمستخدم
+    await update.message.reply_text("✅ تم إرسال رسالتك إلى الإدمن. سيتم الرد عليك قريباً.")
+
 # ✅ get_link
 async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -105,6 +116,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("get_link", get_link))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
     app.add_handler(CommandHandler("my_sales", my_sales))
+    app.add_handler(CommandHandler("contact_admin", contact_admin))  # إضافة هذا السطر
 
     print("✅ البوت يعمل الآن ...")
     app.run_polling()
