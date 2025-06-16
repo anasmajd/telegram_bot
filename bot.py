@@ -132,19 +132,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['reply_target'] = target_id
         await query.message.reply_text(f"✍️ اكتب الآن رسالتك للمستخدم (ID: {target_id})")
 
-# ✅ تنفيذ الرد بعد كتابة الرسالة
+# ✅ تنفيذ الرد بعد كتابة الرسالة أو التقاط رسائل المستخدمين
 async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_USER_ID:
-        return
+    user_id = update.effective_user.id
+    text = update.message.text
 
-    target_id = context.user_data.get("reply_target")
-    if target_id:
-        message = update.message.text
-        await context.bot.send_message(chat_id=target_id, text=message)
-        await update.message.reply_text("✅ تم إرسال الرسالة.")
-        context.user_data["reply_target"] = None
+    if user_id == ADMIN_USER_ID:
+        target_id = context.user_data.get("reply_target")
+        if target_id:
+            await context.bot.send_message(chat_id=target_id, text=text)
+            await update.message.reply_text("✅ تم إرسال الرسالة.")
+            context.user_data['reply_target'] = None
+        else:
+            await handle_buttons(update, context)
     else:
-        await handle_buttons(update, context)
+        if context.user_data.get("awaiting_contact"):
+            context.user_data["awaiting_contact"] = False
+            await contact_admin(update, context)
+        else:
+            await handle_buttons(update, context)
 
 # ✅ تعامل مع الأزرار
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -160,9 +166,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_referrals(update, context)
     elif text == "🛠️ لوحة الإدارة" and update.effective_user.id == ADMIN_USER_ID:
         await update.message.reply_text("🛠️ استخدم الزر أسفل كل رسالة للرد مباشرة.")
-    elif context.user_data.get("awaiting_contact"):
-        context.user_data["awaiting_contact"] = False
-        await contact_admin(update, context)
 
 # ✅ تشغيل البوت
 if __name__ == '__main__':
