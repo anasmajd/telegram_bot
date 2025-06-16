@@ -1,7 +1,7 @@
 import sqlite3
 import logging
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 
 # ✅ التوكن (من BotFather)
 TOKEN = '8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
@@ -111,24 +111,40 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ✅ تواصل مع الإدارة
 async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
-    await context.bot.send_message(chat_id=ADMIN_USER_ID,
-        text=f"رسالة من @{update.effective_user.username or 'بدون يوزر'}:\n{message}")
+    user = update.effective_user
+    keyboard = InlineKeyboardMarkup.from_button(
+        InlineKeyboardButton("🔁 الرد على المستخدم", callback_data=f"reply_{user.id}")
+    )
+    await context.bot.send_message(
+        chat_id=ADMIN_USER_ID,
+        text=f"📩 رسالة من @{user.username or 'بدون يوزر'} ({user.full_name}):\n{message}",
+        reply_markup=keyboard
+    )
     await update.message.reply_text("✅ تم إرسال رسالتك إلى الإدارة.")
 
-# ✅ رد الإدمن على المستخدم
-async def reply_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ✅ رد الإدمن بعد ضغط الزر
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    if data.startswith("reply_"):
+        target_id = int(data.split("_")[1])
+        context.user_data['reply_target'] = target_id
+        await query.message.reply_text(f"✍️ اكتب الآن رسالتك للمستخدم (ID: {target_id})")
+
+# ✅ تنفيذ الرد بعد كتابة الرسالة
+async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_USER_ID:
         return
 
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text("❗️ استخدم الصيغة: /reply <user_id> <الرسالة>")
-        return
-
-    target_id = int(args[0])
-    message = " ".join(args[1:])
-    await context.bot.send_message(chat_id=target_id, text=message)
-    await update.message.reply_text("✅ تم إرسال الرسالة.")
+    target_id = context.user_data.get("reply_target")
+    if target_id:
+        message = update.message.text
+        await context.bot.send_message(chat_id=target_id, text=message)
+        await update.message.reply_text("✅ تم إرسال الرسالة.")
+        context.user_data["reply_target"] = None
+    else:
+        await handle_buttons(update, context)
 
 # ✅ تعامل مع الأزرار
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,7 +159,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📋 عرض الإحالات" and update.effective_user.id == ADMIN_USER_ID:
         await my_referrals(update, context)
     elif text == "🛠️ لوحة الإدارة" and update.effective_user.id == ADMIN_USER_ID:
-        await update.message.reply_text("🛠️ استخدم الأمر /reply <id> <رسالة> للرد.")
+        await update.message.reply_text("🛠️ استخدم الزر أسفل كل رسالة للرد مباشرة.")
     elif context.user_data.get("awaiting_contact"):
         context.user_data["awaiting_contact"] = False
         await contact_admin(update, context)
@@ -157,8 +173,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("get_link", get_link))
     app.add_handler(CommandHandler("my_sales", my_sales))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
-    app.add_handler(CommandHandler("reply", reply_user))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_followup))
 
     print("✅ البوت يعمل الآن ...")
     app.run_polling()
