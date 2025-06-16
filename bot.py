@@ -132,31 +132,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['reply_target'] = target_id
         await query.message.reply_text(f"✍️ اكتب الآن رسالتك للمستخدم (ID: {target_id})")
 
+# ✅ تنفيذ الرد بعد كتابة الرسالة
 async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    message = update.message.text
-
-    # إذا كان المستخدم ينتظر إرسال رسالة للإدارة
-    if context.user_data.get("awaiting_contact"):
-        context.user_data["awaiting_contact"] = False
-        user = update.effective_user
-        keyboard = InlineKeyboardMarkup.from_button(
-            InlineKeyboardButton("🔁 الرد على المستخدم", callback_data=f"reply_{user.id}")
-        )
-        await context.bot.send_message(
-            chat_id=ADMIN_USER_ID,
-            text=f"📩 رسالة من @{user.username or 'بدون يوزر'} ({user.full_name}):\n{message}",
-            reply_markup=keyboard
-        )
-        await update.message.reply_text("✅ تم إرسال رسالتك إلى الإدارة.")
+    if update.effective_user.id != ADMIN_USER_ID:
         return
 
-    # إذا الإدمن يرد على أحد
-    if user_id == ADMIN_USER_ID and context.user_data.get("reply_target"):
-        target_id = context.user_data.get("reply_target")
+    target_id = context.user_data.get("reply_target")
+    if target_id:
+        message = update.message.text
         await context.bot.send_message(chat_id=target_id, text=message)
         await update.message.reply_text("✅ تم إرسال الرسالة.")
         context.user_data["reply_target"] = None
+    else:
+        await handle_buttons(update, context)
+
 # ✅ تعامل مع الأزرار
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
