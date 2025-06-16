@@ -1,4 +1,4 @@
-import sqlite3 import logging import random from telegram import ( Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, ) from telegram.ext import ( ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler, )
+import sqlite3 import logging import random from telegram import ( Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup ) from telegram.ext import ( ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler )
 
 ✅ التوكن (من BotFather)
 
@@ -14,7 +14,7 @@ conn = sqlite3.connect('referrals.db') cursor = conn.cursor() cursor.execute('''
 
 ✅ 100 لون مميز للرسائل
 
-COLOR_CODES = ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫"] * 7 USER_COLORS = {}
+COLOR_CODES = [ "🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫" ] * 7 USER_COLORS = {}
 
 ✅ أمر /start
 
@@ -84,12 +84,10 @@ async def forward_all(update: Update, context: ContextTypes.DEFAULT_TYPE): user 
 cursor.execute("INSERT INTO messages (user_id, message) VALUES (?, ?)", (user.id, message))
 conn.commit()
 
-# تخصيص لون للمستخدم
 if user.id not in USER_COLORS:
     USER_COLORS[user.id] = random.choice(COLOR_CODES)
 
 color = USER_COLORS[user.id]
-
 keyboard = InlineKeyboardMarkup([
     [
         InlineKeyboardButton("🔁 الرد على المستخدم", callback_data=f"reply_{user.id}"),
