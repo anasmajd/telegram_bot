@@ -107,6 +107,27 @@ async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = cursor.fetchone()[0]
     await update.message.reply_text(f"📊 عدد الإحالات المسجلة لديك: {count}")
 
+
+async def reply_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_USER_ID:
+        await update.message.reply_text("❌ هذا الأمر خاص بالإدمن فقط.")
+        return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text("❗️استخدم الصيغة: /reply <user_id> <رسالتك>")
+        return
+
+    try:
+        target_user_id = int(args[0])
+        message_text = " ".join(args[1:])
+        await context.bot.send_message(chat_id=target_user_id, text=message_text)
+        await update.message.reply_text("✅ تم إرسال الرسالة بنجاح.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ حدث خطأ أثناء الإرسال:\n{e}")
+
+
+
 # ✅ Main app
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
@@ -117,6 +138,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("my_referrals", my_referrals))
     app.add_handler(CommandHandler("my_sales", my_sales))
     app.add_handler(CommandHandler("contact_admin", contact_admin))  # إضافة هذا السطر
-
+    app.add_handler(CommandHandler("reply", reply_user))
+    
     print("✅ البوت يعمل الآن ...")
     app.run_polling()
