@@ -19,13 +19,9 @@ from telegram.ext import (
     CallbackQueryHandler,
 )
 
-# التوكن (من BotFather)
 TOKEN = '8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
-
-# معرف الإدمن
 ADMIN_USER_ID = 920325080
 
-# إعداد قاعدة البيانات
 conn = sqlite3.connect('referrals.db')
 cursor = conn.cursor()
 cursor.execute('''
@@ -83,7 +79,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == ADMIN_USER_ID:
         keyboard = [[KeyboardButton("📋 عرض الإحالات")], [KeyboardButton("🛠️ لوحة الإدارة")]]
     else:
-        keyboard = [[KeyboardButton("🔗 رابط الإحالة")], [KeyboardButton("📊 عدد الإحالات")], [KeyboardButton("📩 تواصل مع الإدارة")]]
+        keyboard = [[KeyboardButton("🔗 رابط الإحالة")], [KeyboardButton("📊 عدد الإحالات")]]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("👋 أهلاً بك في المتجر!\nاختر من القائمة أدناه:", reply_markup=reply_markup)
@@ -117,18 +113,27 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(msg)
 
-async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = update.message.text
+async def forward_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    keyboard = InlineKeyboardMarkup.from_button(
-        InlineKeyboardButton("🔁 الرد على المستخدم", callback_data=f"reply_{user.id}")
-    )
+    message = update.message.text
+    cursor.execute("INSERT INTO messages (user_id, message) VALUES (?, ?)", (user.id, message))
+    conn.commit()
+
+    if user.id not in USER_COLORS:
+        USER_COLORS[user.id] = random.choice(COLOR_CODES)
+
+    color = USER_COLORS[user.id]
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔁 الرد على المستخدم", callback_data=f"reply_{user.id}"),
+            InlineKeyboardButton("🗂️ تجميع رسائل العضو", callback_data=f"history_{user.id}")
+        ]
+    ])
     await context.bot.send_message(
         chat_id=ADMIN_USER_ID,
-        text=f"📩 رسالة من @{user.username or 'بدون يوزر'} ({user.full_name}):\n{message}",
+        text=f"{color} رسالة جديدة من @{user.username or 'بدون يوزر'} ({user.full_name}):\n{message}",
         reply_markup=keyboard
     )
-    await update.message.reply_text("✅ تم إرسال رسالتك إلى الإدارة.")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -138,19 +143,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = int(data.split("_")[1])
         context.user_data['reply_target'] = target_id
         await query.message.reply_text(f"✍️ اكتب الآن رسالتك للمستخدم (ID: {target_id})")
+    elif data.startswith("history_"):
+        target_id = int(data.split("_")[1])
+        cursor.execute("SELECT message FROM messages WHERE user_id=?", (target_id,))
+        msgs = cursor.fetchall()
+        if msgs:
+            combined = "\n---\n".join([m[0] for m in msgs[-20:]])
+            await query.message.reply_text(f"📄 آخر رسائل المستخدم:\n{combined}")
+        else:
+            await query.message.reply_text("❌ لا توجد رسائل مسجلة لهذا المستخدم.")
 
 async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_USER_ID:
-        return
-
-    target_id = context.user_data.get("reply_target")
-    if target_id:
-        message = update.message.text
-        await context.bot.send_message(chat_id=target_id, text=message)
-        await update.message.reply_text("✅ تم إرسال الرسالة.")
-        context.user_data["reply_target"] = None
+    if update.effective_user.id == ADMIN_USER_ID:
+        target_id = context.user_data.get("reply_target")
+        if target_id:
+            message = update.message.text
+            await context.bot.send_message(chat_id=target_id, text=message)
+            await update.message.reply_text("✅ تم إرسال الرسالة.")
+            context.user_data["reply_target"] = None
+        else:
+            await handle_buttons(update, context)
     else:
-        await handle_buttons(update, context)
+        await forward_all(update, context)
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -158,16 +172,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await get_link(update, context)
     elif text == "📊 عدد الإحالات":
         await my_sales(update, context)
-    elif text == "📩 تواصل مع الإدارة":
-        await update.message.reply_text("✍️ اكتب رسالتك الآن وسيتم إرسالها للإدارة.")
-        context.user_data["awaiting_contact"] = True
     elif text == "📋 عرض الإحالات" and update.effective_user.id == ADMIN_USER_ID:
         await my_referrals(update, context)
     elif text == "🛠️ لوحة الإدارة" and update.effective_user.id == ADMIN_USER_ID:
         await update.message.reply_text("🛠️ استخدم الزر أسفل كل رسالة للرد مباشرة.")
-    elif context.user_data.get("awaiting_contact"):
-        context.user_data["awaiting_contact"] = False
-        await contact_admin(update, context)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
