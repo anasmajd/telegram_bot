@@ -152,19 +152,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(f"📄 آخر رسائل المستخدم:\n{combined}")
         else:
             await query.message.reply_text("❌ لا توجد رسائل مسجلة لهذا المستخدم.")
-
 async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_USER_ID:
         target_id = context.user_data.get("reply_target")
         if target_id:
-            message = update.message.text
-            await context.bot.send_message(chat_id=target_id, text=message)
+            if update.message.text:
+                await context.bot.send_message(chat_id=target_id, text=update.message.text)
+            elif update.message.photo:
+                await context.bot.send_photo(chat_id=target_id, photo=update.message.photo[-1].file_id)
+            elif update.message.document:
+                await context.bot.send_document(chat_id=target_id, document=update.message.document.file_id)
             await update.message.reply_text("✅ تم إرسال الرسالة.")
             context.user_data["reply_target"] = None
         else:
             await handle_buttons(update, context)
     else:
-        await forward_all(update, context)
+        text = update.message.text
+        if text in ["🔗 رابط الإحالة", "📊 عدد الإحالات"]:
+            await handle_buttons(update, context)
+        else:
+            await forward_all(update, context)
+
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
