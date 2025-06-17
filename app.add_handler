@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sqlite3
-import logging 
+import logging
 import random
 from telegram import (
     Update,
@@ -138,9 +138,12 @@ async def forward_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(chat_id=ADMIN_USER_ID, photo=message.photo[-1].file_id, caption=caption, reply_markup=keyboard)
     elif message.document:
         await context.bot.send_document(chat_id=ADMIN_USER_ID, document=message.document.file_id, caption=caption, reply_markup=keyboard)
+    elif message.video:
+        await context.bot.send_video(chat_id=ADMIN_USER_ID, video=message.video.file_id, caption=caption, reply_markup=keyboard)
+    elif message.voice:
+        await context.bot.send_voice(chat_id=ADMIN_USER_ID, voice=message.voice.file_id, caption=caption, reply_markup=keyboard)
     else:
         await context.bot.send_message(chat_id=ADMIN_USER_ID, text=caption, reply_markup=keyboard)
-
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -159,27 +162,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(f"📄 آخر رسائل المستخدم:\n{combined}")
         else:
             await query.message.reply_text("❌ لا توجد رسائل مسجلة لهذا المستخدم.")
-async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == ADMIN_USER_ID:
-        target_id = context.user_data.get("reply_target")
-        if target_id:
-            if update.message.text:
-                await context.bot.send_message(chat_id=target_id, text=update.message.text)
-            elif update.message.photo:
-                await context.bot.send_photo(chat_id=target_id, photo=update.message.photo[-1].file_id)
-            elif update.message.document:
-                await context.bot.send_document(chat_id=target_id, document=update.message.document.file_id)
-            await update.message.reply_text("✅ تم إرسال الرسالة.")
-            context.user_data["reply_target"] = None
-        else:
-            await handle_buttons(update, context)
-    else:
-        text = update.message.text
-        if text in ["🔗 رابط الإحالة", "📊 عدد الإحالات"]:
-            await handle_buttons(update, context)
-        else:
-            await forward_all(update, context)
 
+async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_USER_ID:
+        await forward_all(update, context)
+        return
+
+    target_id = context.user_data.get("reply_target")
+    if target_id:
+        msg = update.message
+        if msg.text:
+            await context.bot.send_message(chat_id=target_id, text=msg.text)
+        elif msg.photo:
+            await context.bot.send_photo(chat_id=target_id, photo=msg.photo[-1].file_id, caption=msg.caption)
+        elif msg.document:
+            await context.bot.send_document(chat_id=target_id, document=msg.document.file_id, caption=msg.caption)
+        elif msg.video:
+            await context.bot.send_video(chat_id=target_id, video=msg.video.file_id, caption=msg.caption)
+        elif msg.voice:
+            await context.bot.send_voice(chat_id=target_id, voice=msg.voice.file_id, caption=msg.caption)
+        await update.message.reply_text("✅ تم إرسال الرسالة.")
+        context.user_data["reply_target"] = None
+    else:
+        await handle_buttons(update, context)
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -201,7 +206,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("my_sales", my_sales))
     app.add_handler(CommandHandler("my_referrals", my_referrals))
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_followup))
+    app.add_handler(MessageHandler(
+        (filters.TEXT | filters.PHOTO | filters.DOCUMENT | filters.VIDEO | filters.VOICE) & ~filters.COMMAND,
+        reply_followup
+    ))
 
     print("✅ البوت يعمل الآن ...")
     app.run_polling()
