@@ -115,25 +115,32 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def forward_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    message = update.message.text
-    cursor.execute("INSERT INTO messages (user_id, message) VALUES (?, ?)", (user.id, message))
+    message = update.message
+    text = message.caption or message.text or "📎 محتوى غير نصي (صورة/ملف/صوت)"
+
+    cursor.execute("INSERT INTO messages (user_id, message) VALUES (?, ?)", (user.id, text))
     conn.commit()
 
     if user.id not in USER_COLORS:
         USER_COLORS[user.id] = random.choice(COLOR_CODES)
-
     color = USER_COLORS[user.id]
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔁 الرد على المستخدم", callback_data=f"reply_{user.id}"),
             InlineKeyboardButton("🗂️ تجميع رسائل العضو", callback_data=f"history_{user.id}")
         ]
     ])
-    await context.bot.send_message(
-        chat_id=ADMIN_USER_ID,
-        text=f"{color} رسالة جديدة من @{user.username or 'بدون يوزر'} ({user.full_name}):\n{message}",
-        reply_markup=keyboard
-    )
+
+    caption = f"{color} رسالة من @{user.username or 'بدون يوزر'} ({user.full_name}):\n{text}"
+
+    if message.photo:
+        await context.bot.send_photo(chat_id=ADMIN_USER_ID, photo=message.photo[-1].file_id, caption=caption, reply_markup=keyboard)
+    elif message.document:
+        await context.bot.send_document(chat_id=ADMIN_USER_ID, document=message.document.file_id, caption=caption, reply_markup=keyboard)
+    else:
+        await context.bot.send_message(chat_id=ADMIN_USER_ID, text=caption, reply_markup=keyboard)
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
