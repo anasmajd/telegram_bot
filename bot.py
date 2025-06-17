@@ -207,7 +207,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("my_referrals", my_referrals))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(
-        (filters.TEXT | filters.PHOTO | filters.DOCUMENT | filters.VIDEO | filters.VOICE) & ~filters.COMMAND,
+        filters.ALL & ~filters.COMMAND,
         reply_followup
     ))
 
