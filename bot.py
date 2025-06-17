@@ -1,15 +1,31 @@
+# -*- coding: utf-8 -*-
+
 import sqlite3
 import logging
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
+import random
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+    CallbackQueryHandler,
+)
 
-# ✅ التوكن (من BotFather)
+# التوكن (من BotFather)
 TOKEN = '8028540649:AAF8bp_jvM8tibUUmzUzq1DBzwJdrNvAzRo'
 
-# ✅ معرف الإدمن
+# معرف الإدمن
 ADMIN_USER_ID = 920325080
 
-# ✅ إعداد قاعدة البيانات
+# إعداد قاعدة البيانات
 conn = sqlite3.connect('referrals.db')
 cursor = conn.cursor()
 cursor.execute('''
@@ -19,9 +35,17 @@ cursor.execute('''
         referrer_id INTEGER
     )
 ''')
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS messages (
+        user_id INTEGER,
+        message TEXT
+    )
+''')
 conn.commit()
 
-# ✅ أمر /start
+COLOR_CODES = ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫"] * 7
+USER_COLORS = {}
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or ""
@@ -56,40 +80,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
             await context.bot.send_message(chat_id=ADMIN_USER_ID, text=msg)
 
-    # ✅ إعداد لوحة الأزرار حسب الدور
     if user_id == ADMIN_USER_ID:
-        keyboard = [
-            [KeyboardButton("📋 عرض الإحالات")],
-            [KeyboardButton("🛠️ لوحة الإدارة")],
-        ]
+        keyboard = [[KeyboardButton("📋 عرض الإحالات")], [KeyboardButton("🛠️ لوحة الإدارة")]]
     else:
-        keyboard = [
-            [KeyboardButton("🔗 رابط الإحالة")],
-            [KeyboardButton("📊 عدد الإحالات")],
-            [KeyboardButton("📩 تواصل مع الإدارة")],
-        ]
+        keyboard = [[KeyboardButton("🔗 رابط الإحالة")], [KeyboardButton("📊 عدد الإحالات")], [KeyboardButton("📩 تواصل مع الإدارة")]]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("👋 أهلاً بك في المتجر!\nاختر من القائمة أدناه:", reply_markup=reply_markup)
 
-    await update.message.reply_text(
-        "👋 أهلاً بك في المتجر!\nاختر من القائمة أدناه:",
-        reply_markup=reply_markup
-    )
-
-# ✅ رابط الإحالة
 async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     link = f"https://t.me/Janastoreiqbot?start=REP_{user_id}"
     await update.message.reply_text(f"🔗 رابط الإحالة الخاص بك:\n{link}")
 
-# ✅ عدد الإحالات
 async def my_sales(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     cursor.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id=?", (user_id,))
     count = cursor.fetchone()[0]
     await update.message.reply_text(f"📊 عدد الإحالات المسجلة لديك: {count}")
 
-# ✅ عرض الإحالات
 async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     cursor.execute("SELECT user_id, username FROM referrals WHERE referrer_id=?", (user_id,))
@@ -108,7 +117,6 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(msg)
 
-# ✅ تواصل مع الإدارة
 async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
     user = update.effective_user
@@ -122,7 +130,6 @@ async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text("✅ تم إرسال رسالتك إلى الإدارة.")
 
-# ✅ رد الإدمن بعد ضغط الزر
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -132,27 +139,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['reply_target'] = target_id
         await query.message.reply_text(f"✍️ اكتب الآن رسالتك للمستخدم (ID: {target_id})")
 
-# ✅ تنفيذ الرد بعد كتابة الرسالة أو التقاط رسائل المستخدمين
 async def reply_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
+    if update.effective_user.id != ADMIN_USER_ID:
+        return
 
-    if user_id == ADMIN_USER_ID:
-        target_id = context.user_data.get("reply_target")
-        if target_id:
-            await context.bot.send_message(chat_id=target_id, text=text)
-            await update.message.reply_text("✅ تم إرسال الرسالة.")
-            context.user_data['reply_target'] = None
-        else:
-            await handle_buttons(update, context)
+    target_id = context.user_data.get("reply_target")
+    if target_id:
+        message = update.message.text
+        await context.bot.send_message(chat_id=target_id, text=message)
+        await update.message.reply_text("✅ تم إرسال الرسالة.")
+        context.user_data["reply_target"] = None
     else:
-        if context.user_data.get("awaiting_contact"):
-            context.user_data["awaiting_contact"] = False
-            await contact_admin(update, context)
-        else:
-            await handle_buttons(update, context)
+        await handle_buttons(update, context)
 
-# ✅ تعامل مع الأزرار
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if text == "🔗 رابط الإحالة":
@@ -166,8 +165,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_referrals(update, context)
     elif text == "🛠️ لوحة الإدارة" and update.effective_user.id == ADMIN_USER_ID:
         await update.message.reply_text("🛠️ استخدم الزر أسفل كل رسالة للرد مباشرة.")
+    elif context.user_data.get("awaiting_contact"):
+        context.user_data["awaiting_contact"] = False
+        await contact_admin(update, context)
 
-# ✅ تشغيل البوت
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TOKEN).build()
